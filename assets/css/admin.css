@@ -1,0 +1,39 @@
+.psp-new-project-conditions {
+     display: flex;
+     margin: 0 -10px 20px -10px;
+}
+
+.psp-new-project-conditions__project,
+.psp-new-project-conditions__role {
+     width: 47%;
+     max-width: 250px;
+     margin: 0 10px;
+     display: inline-flex;
+     align-items: center;
+}
+.psp-new-project-conditions__project label,
+.psp-new-project-conditions__role label {
+     font-weight: bold;
+     margin-right: 8px;
+     white-space: nowrap;
+}
+
+.psp-new-project-existing {
+     margin-bottom: 30px;
+}
+
+.psp-new-project-cond {
+     padding: 15px;
+     background: #fff;
+     margin-bottom: 10px;
+     border-radius: 6px;
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+}
+
+.psp-new-project-cond span {
+     display: inline-block;
+     font-size: 16px;
+     margin: 0 10px 0 0;
+}

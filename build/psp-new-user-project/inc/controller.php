@@ -3,10 +3,8 @@ add_action( 'set_user_role', 'psp_check_new_register' );
 add_action( 'user_register', 'psp_check_new_register' );
 function psp_check_new_register( $user_id ) {
 
-    $psp_settings   = get_option( 'psp_settings' );
-    $user           = get_user_by( 'id', $user_id );
-    $conditions     = get_option( 'psp_nup_conditions', array() );
-
+    $psp_settings = get_option( 'psp_settings' );
+    $user     = get_user_by( 'id', $user_id );
 
     if( !$user->roles ) {
         return;
@@ -14,77 +12,51 @@ function psp_check_new_register( $user_id ) {
 
     foreach( $user->roles as $role ) {
 
-         // Check if traditional generate new project
-        if( isset( $psp_settings[$role . '_project'] ) && $psp_settings[$role . '_project'] != 'false' ) {
-
-             $clone_id = intval( $psp_settings[$role . '_project'] );
-
-             psp_new_user_project( $clone_id, $user_id );
-
+        if( !isset( $psp_settings[$role . '_project'] ) || $psp_settings[$role . '_project'] == 'false' ) {
+            continue;
         }
 
-        // Check if new way of create new project
-        foreach( $conditions as $condition ) {
-             if( $role == $condition['role'] ) {
-                  psp_new_user_project( $condition['project'], $user_id );
-             }
+        $clone_id = intval( $psp_settings[$role . '_project'] );
+
+        $created_projects = get_user_meta( $user_id, '_psp_auto_projects', false );
+
+        if( in_array( $clone_id, $created_projects ) ) {
+            continue;
+        }
+        add_user_meta( $user_id, '_psp_auto_projects' , $clone_id );
+
+        require_once( PROJECT_PANORAMA_DIR . '/lib/vendor/clone/duplicate-post-admin.php' );
+
+        $post   = get_post( $clone_id );
+        $new_id = psp_auto_create_duplicate( $post, 'publish', $user );
+
+        if ( 0 !== $new_id ) {
+
+            update_post_meta( $new_id, '_psp_assigned_users', array( $user_id ) );
+            update_post_meta( $new_id, 'allowed_users_0_user', $user_id );
+            update_post_meta( $new_id, 'allowed_users', 1 );
+            update_post_meta( $clone_id, '_psp_cloned', 1 );
+            update_post_meta( $new_id, 'client', $user->first_name . ' ' . $user->last_name );
+
+            update_field( 'restrict_access_to_specific_users', array( 'Yes' ), $new_id );
+
+            $new_project = array(
+                'ID'          	=> $new_id,
+                'post_status' 	=> 'publish',
+                'post_title'	=> $user->first_name . ' ' . $user->last_name . ' ' . get_the_title($new_id),
+                'post_name'		=>	''
+            );
+
+            wp_update_post( $new_project );
+
+            do_action( 'psp_notify', 'user_assigned', array(
+                'post_id' => $post_id,
+                'user_id' => $user_id,
+            ) );
+
         }
 
     }
-
-}
-
-function psp_new_user_project( $clone_id = null, $user_id = null ) {
-
-     if( $clone_id == null ) {
-          return false;
-     }
-
-     $user = wp_get_current_user();
-     $user_id = $user->ID;
-
-     $created_projects = get_user_meta( $user_id, '_psp_auto_projects', false );
-
-     if( in_array( $clone_id, $created_projects ) ) {
-         return false;
-     }
-
-     add_user_meta( $user_id, '_psp_auto_projects' , $clone_id );
-
-     require_once( PROJECT_PANORAMA_DIR . '/lib/vendor/clone/duplicate-post-admin.php' );
-
-     $post   = get_post( $clone_id );
-     $new_id = psp_auto_create_duplicate( $post, 'publish', $user );
-
-     if ( 0 !== $new_id ) {
-
-         update_post_meta( $new_id, '_psp_assigned_users', array( $user_id ) );
-         update_post_meta( $new_id, 'allowed_users_0_user', $user_id );
-         update_post_meta( $new_id, 'allowed_users', 1 );
-         update_post_meta( $clone_id, '_psp_cloned', 1 );
-         update_post_meta( $new_id, 'client', $user->first_name . ' ' . $user->last_name );
-
-         update_field( 'restrict_access_to_specific_users', array( 'Yes' ), $new_id );
-
-            $title = apply_filters( 'psp_new_user_project_title',
-                 $user->first_name . ' ' . $user->last_name . ' ' . get_the_title($new_id)
-            , $user, $new_id );
-
-         $new_project = array(
-             'ID'          	=> $new_id,
-             'post_status' 	=> 'publish',
-             'post_title'	=> $title,
-             'post_name'		=>	''
-         );
-
-         wp_update_post( $new_project );
-
-         do_action( 'psp_notify', 'user_assigned', array(
-             'post_id' => $post_id,
-             'user_id' => $user_id,
-         ) );
-
-     }
 
 }
 
@@ -205,81 +177,5 @@ function psp_auto_save_meta( $post_id ) {
     } else {
         delete_post_meta( $post_id, '_psp_auto_template' );
     }
-
-}
-
-add_action( 'wp_ajax_psp_nup_add_condition', 'psp_nup_add_condition' );
-function psp_nup_add_condition() {
-
-     if( !isset($_POST['role']) || !isset($_POST['project']) ) {
-          wp_send_json_error( array( 'message' => 'Project or role not set', 'role' => $_POST['role'], 'project' => $_POST['project'] ) );
-     }
-
-     $conditions = get_option( 'psp_nup_conditions', array() );
-
-     $conditions[] = array(
-          'role'    =>   $_POST['role'],
-          'project' =>   $_POST['project']
-     );
-
-     update_option( 'psp_nup_conditions', $conditions );
-
-     global $wp_roles;
-
-     if ( ! isset( $wp_roles ) ) {
-         $wp_roles = new WP_Roles();
-     }
-
-     $rolename = '';
-     foreach( $wp_roles->roles as $key => $name ) {
-          if( $key == $_POST['role'] ) {
-               $rolename = $name['name'];
-          }
-     }
-
-     ob_start(); ?>
-
-     <div class="psp-new-project-cond" data-offset="0">
-          <span class="conditions">
-               <span class="user-role"><?php echo esc_html( $rolename ); ?></span>
-               <span class="project"><a href="<?php echo esc_url( get_the_permalink($_POST['project']) ); ?>"><?php echo esc_html( get_the_title( $_POST['project'] ) ); ?></a></span>
-          </span>
-          <button class="js-remove-cond">Remove</button>
-     </div>
-
-     <?php
-     $markup = ob_get_clean();
-
-     wp_send_json_success( array( 'message' => 'success', 'markup' => $markup ) );
-
-}
-
-add_action( 'wp_ajax_psp_nup_remove_condition', 'psp_nup_remove_condition' );
-function psp_nup_remove_condition() {
-
-     if( !isset($_POST['offset']) ) {
-          wp_send_json_error( array( 'message' => 'No offset set' ) );
-     }
-
-     $conditions = get_option( 'psp_nup_conditions', array() );
-
-     if( empty($conditions) ) {
-          wp_send_json_error( array( 'message' => 'No conditions saved' ) );
-     }
-
-     $new_conditions = array();
-
-     $i = 0;
-
-     foreach( $conditions as $condition ) {
-          if( $i != intval($_POST['offset']) ) {
-               $new_conditions[] = $condition;
-          }
-          $i++;
-     }
-
-     update_option( 'psp_nup_conditions', $new_conditions );
-
-     wp_send_json_success( array( 'message' => 'success' ) );
 
 }
