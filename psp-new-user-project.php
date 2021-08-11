@@ -3,7 +3,7 @@
 Plugin Name: Project Panorama - New User Projects
 Plugin URI: https://www.projectpanorama.com/
 Description: Automatically creates and assigns a project to a new user
-Version: 1.5
+Version: 1.5.1
 Author: SnapOrbital
 Author URI: https://www.snaporbital.com/
 Text Domain: psp-projects

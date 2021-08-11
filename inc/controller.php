@@ -23,6 +23,7 @@ function psp_check_new_register( $user_id ) {
 
         }
 
+
         // Check if new way of create new project
         foreach( $conditions as $condition ) {
              if( $role == $condition['role'] ) {
@@ -40,12 +41,9 @@ function psp_new_user_project( $clone_id = null, $user_id = null ) {
           return false;
      }
 
-     $user = wp_get_current_user();
-     $user_id = $user->ID;
-
      $created_projects = get_user_meta( $user_id, '_psp_auto_projects', false );
 
-     if( in_array( $clone_id, $created_projects ) ) {
+     if( $created_projects && in_array( $clone_id, $created_projects ) ) {
          return false;
      }
 
@@ -58,11 +56,13 @@ function psp_new_user_project( $clone_id = null, $user_id = null ) {
 
      if ( 0 !== $new_id ) {
 
-         update_post_meta( $new_id, '_psp_assigned_users', array( $user_id ) );
-         update_post_meta( $new_id, 'allowed_users_0_user', $user_id );
-         update_post_meta( $new_id, 'allowed_users', 1 );
+         $user = get_user_by( 'id', $user_id );
+         
+         add_row( 'allowed_users', array( 'user' => $user ), $new_id );
+
+         update_field( 'client', $user->first_name . ' ' . $user->last_name, $new_id );
+
          update_post_meta( $clone_id, '_psp_cloned', 1 );
-         update_post_meta( $new_id, 'client', $user->first_name . ' ' . $user->last_name );
 
          update_field( 'restrict_access_to_specific_users', array( 'Yes' ), $new_id );
 
@@ -102,7 +102,7 @@ function psp_auto_create_duplicate( $post, $status = null , $new_post_author = n
     }
 
     if( !$new_post_author ) {
-        $new_post_author = psp_duplicate_post_get_current_user();
+        $new_post_author = wp_get_current_user();
     }
 
     $new_post = array(
